@@ -32,28 +32,32 @@ class Line:
         return ExchangesOrders(line.split(' - ')[1], date.strptime(self.time, "%Y-%m-%d %H:%M:%S"))
 
 
-def readFile(fileName):
+def readFile(fileName, hour):
     orders_dict = {}
     with open(fileName) as f:
         for line in f:
             line = Line(line)
-            orders_dict[line.exchangesOrders.date] = line.exchangesOrders
+            if (" " + hour + ":") in line.time:
+                orders_dict[line.exchangesOrders.date] = line.exchangesOrders
     return orders_dict
 
 
-data = readFile("eth.log")
+def draw(file, prefix, hour):
+    data = readFile(file, hour)
 
-time = list(key for key in data.keys())
-binance = list(float(value.get("binance1ask")) for value in data.values())
-bitmex = list(float(value.get("bitmex1ask")) for value in data.values())
-ftx = list(float(value.get("ftx1ask")) for value in data.values())
-okex = list(float(value.get("okex1ask")) for value in data.values())
+    time = list(key for key in data.keys())
+    binance = list(float(value.get("binance1" + prefix)) for value in data.values())
+    bitmex = list(float(value.get("bitmex1" + prefix)) for value in data.values())
+    ftx = list(float(value.get("ftx1" + prefix)) for value in data.values())
+    okex = list(float(value.get("okex1" + prefix)) for value in data.values())
 
-#plt.plot(['21:42:52', '21:42:54', '21:42:56', '21:42:58'], [9109.36, 9109.05, 9109.04, 9109.56])
-plt.plot(time, binance)
-plt.plot(time, bitmex)
-plt.plot(time, ftx)
-plt.plot(time, okex)
+    plt.plot(time, binance)
+    plt.plot(time, bitmex)
+    plt.plot(time, ftx)
+    plt.plot(time, okex)
 
-plt.legend(['binance', 'bitmex', 'ftx', 'okex'])
-plt.plot()
+    plt.legend(['binance', 'bitmex', 'ftx', 'okex'])
+    plt.savefig(file.split(".")[0] + ".png")
+
+
+draw("eth.log", "bid", '04')
