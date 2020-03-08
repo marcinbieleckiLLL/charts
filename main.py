@@ -32,18 +32,18 @@ class Line:
         return ExchangesOrders(line.split(' - ')[1], date.strptime(self.time, "%Y-%m-%d %H:%M:%S"))
 
 
-def readFile(fileName, hour):
+def readFile(fileName, from_date, to_date):
     orders_dict = {}
-    with open(fileName) as f:
-        for line in f:
+    with open(fileName) as file:
+        for line in file:
             line = Line(line)
-            if (" " + hour + ":") in line.time:
-                orders_dict[line.exchangesOrders.date] = line.exchangesOrders
+            if from_date is None or to_date is None or from_date < line.exchangesOrders.date < to_date:
+                    orders_dict[line.exchangesOrders.date] = line.exchangesOrders
     return orders_dict
 
 
-def draw(file, prefix, hour):
-    data = readFile(file, hour)
+def draw(file, prefix, from_date, to_date):
+    data = readFile(file, from_date, to_date)
 
     time = list(key for key in data.keys())
     binance = list(float(value.get("binance1" + prefix)) for value in data.values())
@@ -60,4 +60,4 @@ def draw(file, prefix, hour):
     plt.savefig(file.split(".")[0] + ".png")
 
 
-draw("eth.log", "bid", '04')
+draw("btc-07.03.log", "bid", date(2020, 3, 7, 17, 0), date(2020, 3, 7, 17, 2))
