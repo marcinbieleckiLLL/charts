@@ -38,8 +38,15 @@ def readFile(fileName, from_date, to_date):
         for line in file:
             line = Line(line)
             if from_date is None or to_date is None or from_date < line.exchangesOrders.date < to_date:
-                    orders_dict[line.exchangesOrders.date] = line.exchangesOrders
+                orders_dict[line.exchangesOrders.date] = line.exchangesOrders
     return orders_dict
+
+
+def getData(file, prefix, from_date, to_date):
+    data = readFile(file, from_date, to_date)
+    time = list(key for key in data.keys())
+    values = list(float(value.get(prefix)) for value in data.values())
+    return [file, time, values]
 
 
 def draw(file, prefix, from_date, to_date):
@@ -60,4 +67,16 @@ def draw(file, prefix, from_date, to_date):
     plt.savefig(file.split(".")[0] + ".png")
 
 
-draw("btc-07.03.log", "bid", date(2020, 3, 7, 17, 0), date(2020, 3, 7, 17, 2))
+def draw(data):
+    for d in data:
+        plt.plot(d[1], d[2])
+    plt.legend(list(d[0].split(".")[0] for d in data))
+    plt.savefig("abc.png")
+
+
+btc = getData("btc.log", "okex1bid", date(2020, 3, 27, 22, 00), date(2020, 3, 27, 23, 59))
+btcFutureWeek = getData("btcFutureWeek.log", "okex1bid", date(2020, 3, 27, 22, 00), date(2020, 3, 27, 23, 59))
+btcFutureTwoWeeks = getData("btcFutureTwoWeeks.log", "okex1bid", date(2020, 3, 27, 22, 00), date(2020, 3, 27, 23, 59))
+btcFutureQuarter = getData("btcFutureQuarter.log", "okex1bid", date(2020, 3, 27, 22, 00), date(2020, 3, 27, 23, 59))
+btcFutureTwoQuarters = getData("btcFutureTwoQuarters.log", "okex1bid", date(2020, 3, 27, 22, 00), date(2020, 3, 27, 23, 59))
+draw([btc, btcFutureWeek, btcFutureTwoWeeks, btcFutureQuarter, btcFutureTwoQuarters])
