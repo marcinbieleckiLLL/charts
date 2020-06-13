@@ -1,3 +1,4 @@
+import sys
 import matplotlib.pyplot as plt
 import regex as re
 from datetime import datetime as date
@@ -74,9 +75,35 @@ def draw(data):
     plt.savefig("abc.png")
 
 
-btc = getData("btc.log", "okex1bid", date(2020, 3, 27, 22, 00), date(2020, 3, 27, 23, 59))
-btcFutureWeek = getData("btcFutureWeek.log", "okex1bid", date(2020, 3, 27, 22, 00), date(2020, 3, 27, 23, 59))
-btcFutureTwoWeeks = getData("btcFutureTwoWeeks.log", "okex1bid", date(2020, 3, 27, 22, 00), date(2020, 3, 27, 23, 59))
-btcFutureQuarter = getData("btcFutureQuarter.log", "okex1bid", date(2020, 3, 27, 22, 00), date(2020, 3, 27, 23, 59))
-btcFutureTwoQuarters = getData("btcFutureTwoQuarters.log", "okex1bid", date(2020, 3, 27, 22, 00), date(2020, 3, 27, 23, 59))
-draw([btc, btcFutureWeek, btcFutureTwoWeeks, btcFutureQuarter, btcFutureTwoQuarters])
+def main(dateFrom, timeFrom, dateTo, timeTo):
+    yFrom = int(dateFrom.split("-")[0])
+    MFrom = int(dateFrom.split("-")[1])
+    dFrom = int(dateFrom.split("-")[2])
+    hFrom = int(timeFrom.split(":")[0])
+    mFrom = int(timeFrom.split(":")[1])
+
+    yTo = int(dateTo.split("-")[0])
+    MTo = int(dateTo.split("-")[1])
+    dTo = int(dateTo.split("-")[2])
+    hTo = int(timeTo.split(":")[0])
+    mTo = int(timeTo.split(":")[1])
+
+    btc = getData("btc.log", "okex1bid", date(yFrom, MFrom, dFrom, hFrom, mFrom), date(yTo, MTo, dTo, hTo, mTo))
+    btcFutureWeek = getData("btcFutureWeek.log", "okex1bid", date(yFrom, MFrom, dFrom, hFrom, mFrom),
+                            date(yTo, MTo, dTo, hTo, mTo))
+    btcFutureTwoWeeks = getData("btcFutureTwoWeeks.log", "okex1bid", date(yFrom, MFrom, dFrom, hFrom, mFrom),
+                                date(yTo, MTo, dTo, hTo, mTo))
+    btcFutureQuarter = getData("btcFutureQuarter.log", "okex1bid", date(yFrom, MFrom, dFrom, hFrom, mFrom),
+                               date(yTo, MTo, dTo, hTo, mTo))
+    btcFutureTwoQuarters = getData("btcFutureTwoQuarters.log", "okex1bid", date(yFrom, MFrom, dFrom, hFrom, mFrom),
+                                   date(yTo, MTo, dTo, hTo, mTo))
+    draw([btc, btcFutureWeek, btcFutureTwoWeeks, btcFutureQuarter, btcFutureTwoQuarters])
+
+
+if __name__ == "__main__":
+    dateFrom = sys.argv[1]
+    timeFrom = sys.argv[2]
+    dateTo = sys.argv[3]
+    timeTo = sys.argv[4]
+
+    main(dateFrom, timeFrom, dateTo, timeTo)
