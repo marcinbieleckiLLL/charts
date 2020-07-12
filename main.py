@@ -1,109 +1,109 @@
-import sys
+import numpy as np
+import pandas as pd
 import matplotlib.pyplot as plt
-import regex as re
-from datetime import datetime as date
+from keras.layers import LSTM, Dense
+from keras.models import Sequential
+from keras.models import load_model
+from sklearn.preprocessing import MinMaxScaler
+
+scaler = MinMaxScaler()
 
 
-class ExchangesOrders:
-    def __init__(self, line, date):
-        self.dict = self.createDict(line)
-        self.date = date
+def get_prices(fileName):
+    df = pd.read_csv(fileName)
+    prices = np.array(df['Price'])[::-1]
 
-    def get(self, const):
-        return self.dict[const]
-
-    def createDict(self, line):
-        dict = {}
-        for item in line.split(";"):
-            if isinstance(item.split(":"), list) and len(item.split(":")) > 1:
-                key, value = item.split(":")
-                dict[key] = value
-        return dict
+    return scaler.fit_transform(prices.reshape(len(prices), 1))
 
 
-class Line:
-    def __init__(self, line):
-        self.time = self.getTime(line)
-        self.exchangesOrders = self.getExchangeOrders(line)
+def split_sequence(seq, n_steps_in, n_steps_out):
+    X, y = [], []
 
-    def getTime(self, line):
-        return re.search("^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}", line).group(0)
+    for i in range(len(seq)):
+        end = i + n_steps_in
+        out_end = end + n_steps_out
 
-    def getExchangeOrders(self, line):
-        return ExchangesOrders(line.split(' - ')[1], date.strptime(self.time, "%Y-%m-%d %H:%M:%S"))
+        if out_end > len(seq):
+            break
 
+        seq_x, seq_y = seq[i:end], seq[end:out_end]
 
-def readFile(fileName, from_date, to_date):
-    orders_dict = {}
-    with open(fileName) as file:
-        for line in file:
-            line = Line(line)
-            if from_date is None or to_date is None or from_date < line.exchangesOrders.date < to_date:
-                orders_dict[line.exchangesOrders.date] = line.exchangesOrders
-    return orders_dict
+        X.append(seq_x)
+        y.append(seq_y)
+
+    return np.array(X), np.array(y)
 
 
-def getData(file, prefix, from_date, to_date):
-    data = readFile(file, from_date, to_date)
-    time = list(key for key in data.keys())
-    values = list(float(value.get(prefix)) for value in data.values())
-    return [file, time, values]
+def predict(model, i):
+    futurePrices = np.array(pd.read_csv("BTC_EUR_last_month_gdax.csv")["Price"])
+
+    testX1 = prices[len(prices) - n_per_in + i:len(prices)]
+    testX2 = futurePrices[len(futurePrices) - i:len(futurePrices)][::-1]
+
+    futurePrices = futurePrices[len(futurePrices) - n_per_out - i:len(futurePrices) - i][::-1]
+
+    if len(testX2) > 0:
+        testX = [*testX1, *scaler.fit_transform(testX2.reshape(len(testX2), 1))]
+    else:
+        testX = testX1
+
+    testX = np.reshape(testX, (1, n_per_in, n_features))
+
+    preds = model.predict(testX, batch_size=2)
+    preds = scaler.inverse_transform(preds.reshape(-1, 1))
+
+    plt.figure(figsize=(10, 5))
+    plt.plot(futurePrices, color='red', label='Real BTC-EUR Price')
+    plt.plot(preds, color='blue', label='LSTM BTC-EUR Prediction')
+    plt.title('Bitcoin Price Prediction')
+    plt.xlabel('Time')
+    plt.ylabel('Bitcoin Price')
+    plt.legend()
+    plt.grid(True, linestyle='-.')
+    plt.savefig("predict-" + str(i))
 
 
-def draw(file, prefix, from_date, to_date):
-    data = readFile(file, from_date, to_date)
+prices = get_prices("BTC_EUR_historical_gdax.csv")
 
-    time = list(key for key in data.keys())
-    binance = list(float(value.get("binance1" + prefix)) for value in data.values())
-    bitmex = list(float(value.get("bitmex1" + prefix)) for value in data.values())
-    ftx = list(float(value.get("ftx1" + prefix)) for value in data.values())
-    okex = list(float(value.get("okex1" + prefix)) for value in data.values())
+# How many periods looking back to train
+n_per_in = 30
 
-    plt.plot(time, binance)
-    plt.plot(time, bitmex)
-    plt.plot(time, ftx)
-    plt.plot(time, okex)
+# How many periods ahead to predict
+n_per_out = 10
 
-    plt.legend(['binance', 'bitmex', 'ftx', 'okex'])
-    plt.savefig(file.split(".")[0] + ".png")
+# Features (in this case it's 1 because there is only one feature: price)
+n_features = 1
 
+# Splitting the data into appropriate sequences
+X, y = split_sequence(prices, n_per_in, n_per_out)
 
-def draw(data):
-    for d in data:
-        plt.plot(d[1], d[2])
-    plt.legend(list(d[0].split(".")[0] for d in data))
-    plt.savefig("abc.png")
+# Reshaping the X variable from 2D to 3D
+X = X.reshape((X.shape[0], X.shape[1], n_features))
 
+# LSTM Model parameters, I chose
+batch_size = 2  # Batch size (you may try different values)
+epochs = 200  # Epoch (you may try different values)
+loss = 'mean_squared_error'  # Since the metric is MSE/RMSE
+optimizer = 'rmsprop'  # Recommended optimizer for RNN
+activation = 'linear'  # Linear activation
+input_shape = (n_per_in, n_features)  # Input dimension
+output_dim = 10  # Output dimension
 
-def main(dateFrom, timeFrom, dateTo, timeTo):
-    yFrom = int(dateFrom.split("-")[0])
-    MFrom = int(dateFrom.split("-")[1])
-    dFrom = int(dateFrom.split("-")[2])
-    hFrom = int(timeFrom.split(":")[0])
-    mFrom = int(timeFrom.split(":")[1])
+'''model = Sequential()
+model.add(LSTM(units=output_dim, return_sequences=True, input_shape=input_shape))
+model.add(Dense(units=32, activation=activation))
+model.add(LSTM(units=output_dim, return_sequences=False))
+model.add(Dense(units=10, activation=activation))
+model.compile(optimizer=optimizer, loss=loss)
 
-    yTo = int(dateTo.split("-")[0])
-    MTo = int(dateTo.split("-")[1])
-    dTo = int(dateTo.split("-")[2])
-    hTo = int(timeTo.split(":")[0])
-    mTo = int(timeTo.split(":")[1])
+model.fit(x=X,
+          y=y,
+          batch_size=batch_size,
+          epochs=epochs,
+          validation_split=0.05)
 
-    btc = getData("btc.log", "okex1bid", date(yFrom, MFrom, dFrom, hFrom, mFrom), date(yTo, MTo, dTo, hTo, mTo))
-    btcFutureWeek = getData("btcFutureWeek.log", "okex1bid", date(yFrom, MFrom, dFrom, hFrom, mFrom),
-                            date(yTo, MTo, dTo, hTo, mTo))
-    btcFutureTwoWeeks = getData("btcFutureTwoWeeks.log", "okex1bid", date(yFrom, MFrom, dFrom, hFrom, mFrom),
-                                date(yTo, MTo, dTo, hTo, mTo))
-    btcFutureQuarter = getData("btcFutureQuarter.log", "okex1bid", date(yFrom, MFrom, dFrom, hFrom, mFrom),
-                               date(yTo, MTo, dTo, hTo, mTo))
-    btcFutureTwoQuarters = getData("btcFutureTwoQuarters.log", "okex1bid", date(yFrom, MFrom, dFrom, hFrom, mFrom),
-                                   date(yTo, MTo, dTo, hTo, mTo))
-    draw([btc, btcFutureWeek, btcFutureTwoWeeks, btcFutureQuarter, btcFutureTwoQuarters])
+model.save('coin_predictor.h5')'''
+model = load_model('coin_predictor.h5')
 
-
-if __name__ == "__main__":
-    dateFrom = sys.argv[1]
-    timeFrom = sys.argv[2]
-    dateTo = sys.argv[3]
-    timeTo = sys.argv[4]
-
-    main(dateFrom, timeFrom, dateTo, timeTo)
+for i in range(0, 29):
+    predict(model, i)
